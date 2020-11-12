@@ -28,6 +28,13 @@ eg:
 
 Read more [here](https://help.github.com/articles/syncing-a-fork/).
 
+## Pull options
+
+  git config pull.rebase false  # merge (the default strategy)
+  git config pull.rebase true   # rebase
+  git config pull.ff only       # fast-forward only
+
+
 ## Subtree  
 
 The `tests` directory is a Git subtree created with the 
@@ -83,4 +90,9 @@ To sign Git commits with a GPG key on Mac use [GPG Suite](https://gpgtools.org/)
 
 Read more: 
 https://gist.github.com/danieleggert/b029d44d4a54b328c0bac65d46ba4c65
+
+
+## Change Git history root 
+
+https://stackoverflow.com/questions/4515580/how-do-i-remove-the-old-history-from-a-git-repository
 

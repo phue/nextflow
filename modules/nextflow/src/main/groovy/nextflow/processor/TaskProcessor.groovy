@@ -50,6 +50,7 @@ import groovyx.gpars.group.PGroup
 import nextflow.NF
 import nextflow.Nextflow
 import nextflow.Session
+import nextflow.ast.NextflowDSLImpl
 import nextflow.ast.TaskCmdXform
 import nextflow.ast.TaskTemplateVarsXform
 import nextflow.cloud.CloudSpotTerminationException
@@ -75,6 +76,7 @@ import nextflow.script.BaseScript
 import nextflow.script.BodyDef
 import nextflow.script.ProcessConfig
 import nextflow.script.ScriptType
+import nextflow.script.TaskClosure
 import nextflow.script.params.BasicMode
 import nextflow.script.params.EachInParam
 import nextflow.script.params.EnvInParam
@@ -337,7 +339,7 @@ class TaskProcessor {
 
     int getMaxForks() { maxForks }
 
-    protected void checkWarn(String msg, Map opts) {
+    protected void checkWarn(String msg, Map opts=null) {
         if( NF.isStrictMode() )
             throw new ProcessUnrecoverableException(msg)
         if( opts )
@@ -570,8 +572,14 @@ class TaskProcessor {
         if( !checkWhenGuard(task) )
             return
 
-        // -- resolve the task command script
-        task.resolve(taskBody)
+        TaskClosure block
+        if( session.stubRun && (block=task.config.getStubBlock()) ) {
+            task.resolve(block)
+        }
+        else {
+            // -- resolve the task command script
+            task.resolve(taskBody)
+        }
 
         // -- verify if exists a stored result for this case,
         //    if true skip the execution and return the stored data
@@ -632,7 +640,7 @@ class TaskProcessor {
         assert script != null
 
         def result = new StringBuilder()
-        result << script.stripIndent().trim()
+        result << script.stripIndent(true).trim()
         result << '\n'
 
         if( result[0] != '#' || result[1] != '!') {
@@ -1079,7 +1087,7 @@ class TaskProcessor {
 
         if( error.source )  {
             message << "\nWhen block:"
-            error.source.stripIndent().eachLine {
+            error.source.stripIndent(true).eachLine {
                 message << "  $it"
             }
         }
@@ -1101,7 +1109,7 @@ class TaskProcessor {
         if( task?.script ) {
             // - print the executed command
             message << "Command executed${task.template ? " [$task.template]": ''}:\n"
-            task.script?.stripIndent()?.trim()?.eachLine {
+            task.script?.stripIndent(true)?.trim()?.eachLine {
                 message << "  ${it}"
             }
 
@@ -1142,7 +1150,7 @@ class TaskProcessor {
         else {
             if( task?.source )  {
                 message << "Source block:"
-                task.source.stripIndent().eachLine {
+                task.source.stripIndent(true).eachLine {
                     message << "  $it"
                 }
             }
@@ -1385,7 +1393,7 @@ class TaskProcessor {
 
         // fetch the output value
         final val = collectOutEnvMap(workDir).get(param.name)
-        if( val == null )
+        if( val == null && !param.optional )
             throw new MissingValueException("Missing environment variable: $param.name")
         // set into the output set
         task.setOutput(param,val)
@@ -1925,11 +1933,11 @@ class TaskProcessor {
 
         List keys = [ session.uniqueId, name, task.source ]
 
-        if( task.containerEnabled )
+        if( task.isContainerEnabled() )
             keys << task.container
 
         // add all the input name-value pairs to the key generator
-        task.inputs.each {
+        for( Map.Entry<InParam,Object> it : task.inputs ) {
             keys.add( it.key.name )
             keys.add( it.value )
         }
@@ -1955,6 +1963,10 @@ class TaskProcessor {
         final conda = task.getCondaEnv()
         if( conda ) {
             keys.add(conda)
+        }
+
+        if( session.stubRun ) {
+            keys.add('stub-run')
         }
 
         final mode = config.getHashMode()
@@ -2031,7 +2043,7 @@ class TaskProcessor {
     protected boolean checkWhenGuard(TaskRun task) {
 
         try {
-            def pass = task.config.getGuard('when')
+            def pass = task.config.getGuard(NextflowDSLImpl.PROCESS_WHEN)
             if( pass ) {
                 return true
             }

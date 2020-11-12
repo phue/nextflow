@@ -77,6 +77,8 @@ class ConfigBuilder {
 
     Map<ConfigObject, String> emptyVariables = new LinkedHashMap<>(10)
 
+    Map<String,String> env = new HashMap<>(System.getenv())
+
     List<String> warnings = new ArrayList<>(10);
 
     {
@@ -205,6 +207,7 @@ class ConfigBuilder {
 
         /**
          * Config file in the pipeline base dir
+         * This config file name should be predictable, therefore cannot be overridden
          */
         def base = null
         if( baseDir && baseDir != currentDir ) {
@@ -217,8 +220,10 @@ class ConfigBuilder {
 
         /**
          * Local or user provided file
+         * Default config file name can be overridden with `NXF_CONFIG_FILE` env variable
          */
-        def local = currentDir.resolve('nextflow.config')
+        def configFileName = env.get('NXF_CONFIG_FILE') ?: 'nextflow.config'
+        def local = currentDir.resolve(configFileName)
         if( local.exists() && local != base ) {
             log.debug "Found config local: $local"
             result << local
@@ -317,7 +322,7 @@ class ConfigBuilder {
         final slurper = new ConfigParser().setRenderClosureAsString(showClosures)
         ConfigObject result = new ConfigObject()
 
-        if( cmdRun?.params )
+        if( cmdRun && (cmdRun.params || cmdRun.paramsFile) )
             slurper.setParams(cmdRun.parsedParams)
 
         // add the user specified environment to the session env
@@ -507,6 +512,9 @@ class ConfigBuilder {
         // -- set the run name
         if( cmdRun.runName )
             config.runName = cmdRun.runName
+
+        if( cmdRun.stubRun )
+            config.stubRun = cmdRun.stubRun
 
         // -- sets the working directory
         if( cmdRun.workDir )

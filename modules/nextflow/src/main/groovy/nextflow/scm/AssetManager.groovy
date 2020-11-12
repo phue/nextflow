@@ -385,23 +385,23 @@ class AssetManager {
 
     File getLocalPath() { localPath }
 
-    ScriptFile getScriptFile() {
+    ScriptFile getScriptFile(String scriptName=null) {
 
-        def result = new ScriptFile(getMainScriptFile())
+        def result = new ScriptFile(getMainScriptFile(scriptName))
         result.revisionInfo = getCurrentRevisionAndName()
-        result.repository = getGitConfigRemoteUrl()
+        result.repository = getRepositoryUrl()
         result.localPath = localPath.toPath()
         result.projectName = project
 
         return result
     }
 
-    File getMainScriptFile() {
+    File getMainScriptFile(String scriptName=null) {
         if( !localPath.exists() ) {
             throw new AbortOperationException("Unknown project folder: $localPath")
         }
 
-        def mainScript = getMainScriptName()
+        def mainScript = scriptName ?: getMainScriptName()
         def result = new File(localPath, mainScript)
         if( !result.exists() )
             throw new AbortOperationException("Missing project main script: $result")
@@ -469,7 +469,7 @@ class AssetManager {
                 // no error => exist, return a path for it
                 return new ProviderPath(provider, MANIFEST_FILE_NAME)
             }
-            catch (IOException e) {
+            catch (Exception e) {
                 provider.validateRepo()
                 log.debug "Cannot retried remote config file -- likely does not exist"
                 return null
@@ -480,7 +480,7 @@ class AssetManager {
 
     String getBaseName() {
         def result = project.tokenize('/')
-        if( result.size() > 2 ) throw new IllegalArgumentException("Not a valid projct name: $project")
+        if( result.size() > 2 ) throw new IllegalArgumentException("Not a valid project name: $project")
         return result.size()==1 ? result[0] : result[1]
     }
 
